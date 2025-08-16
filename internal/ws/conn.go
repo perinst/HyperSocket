@@ -151,7 +151,7 @@ func (ws *wsConn) readLoop() {
 			msg := string(payload)
 			log.Printf("<- text: %q", msg)
 			// Echo back
-			if err := ws.writeFrame(opcodeText, true, []byte("echo: "+msg)); err != nil {
+			if err := ws.writeFrame(opcodeText, true, []byte(msg)); err != nil {
 				return
 			}
 

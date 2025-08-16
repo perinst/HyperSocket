@@ -32,7 +32,7 @@
       const log = (...args) => {
         document.getElementById("log").textContent += args.join(" ") + "\n";
       };
-      const ws = new WebSocket("ws://" + location.host + "/ws", "chat");
+      const ws = new WebSocket("ws://localhost:8080/ws", "chat");
       ws.onopen = () => {
         log("WS open");
         ws.send("hello from browser");

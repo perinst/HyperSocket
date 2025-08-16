@@ -117,6 +117,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	registerConn(c)
+	log.Printf("Client connected. Total active connections: %d", Active())
 
 	go c.readLoop()
 	go c.keepAlive()
@@ -150,10 +151,8 @@ func (ws *wsConn) readLoop() {
 		case opcodeText:
 			msg := string(payload)
 			log.Printf("<- text: %q", msg)
-			// Echo back
-			if err := ws.writeFrame(opcodeText, true, []byte("echo: "+msg)); err != nil {
-				return
-			}
+			// Broadcast to all connected clients
+			ws.broadcast(msg)
 
 		case opcodeBinary:
 			log.Printf("<- %d bytes binary", len(payload))
@@ -346,4 +345,23 @@ func (ws *wsConn) close() {
 	ws.mu.Unlock()
 	_ = ws.conn.Close()
 	unregisterConn(ws)
+	log.Printf("Client disconnected. Total active connections: %d", Active())
+}
+
+// broadcast sends a message to all connected clients
+func (ws *wsConn) broadcast(msg string) {
+	regMu.Lock()
+	clients := make([]*wsConn, 0, len(conns))
+	for conn := range conns {
+		clients = append(clients, conn)
+	}
+	regMu.Unlock()
+
+	payload := []byte(msg)
+	for _, client := range clients {
+		if err := client.writeFrame(opcodeText, true, payload); err != nil {
+			log.Printf("Failed to send message to client: %v", err)
+			// Don't close the connection here, let it fail naturally
+		}
+	}
 }

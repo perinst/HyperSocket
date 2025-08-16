@@ -190,19 +190,14 @@ func (ws *wsConn) keepAlive() {
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 	idleTimeout := 60 * time.Second
-	for {
-		select {
-		case <-ticker.C:
-			// Send ping
-			if err := ws.writeFrame(opcodePing, true, []byte("heartbeat")); err != nil {
-				return
-			}
-			// Close if no pong for a while
-			if time.Since(ws.lastPong) > idleTimeout {
-				log.Printf("idle timeout, closing")
-				ws.close()
-				return
-			}
+	for range ticker.C {
+		if err := ws.writeFrame(opcodePing, true, []byte("heartbeat")); err != nil {
+			return
+		}
+		if time.Since(ws.lastPong) > idleTimeout {
+			log.Printf("idle timeout, closing")
+			ws.close()
+			return
 		}
 	}
 }

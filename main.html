@@ -2,55 +2,185 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Minimal WS (Go)</title>
+    <title>HyperSocket Chat</title>
     <style>
       body {
         font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
         max-width: 720px;
         margin: 40px auto;
+        padding: 20px;
       }
-      #log {
+      #chat-container {
         border: 1px solid #ddd;
-        padding: 8px;
-        min-height: 200px;
+        border-radius: 8px;
+        padding: 16px;
+        margin: 20px 0;
+      }
+      #messages {
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        padding: 12px;
+        min-height: 300px;
+        max-height: 400px;
+        overflow-y: auto;
+        background: #f9f9f9;
         white-space: pre-wrap;
+        margin-bottom: 16px;
+      }
+      #input-container {
+        display: flex;
+        gap: 8px;
+      }
+      #msg {
+        flex: 1;
+        padding: 8px 12px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+      #sendBtn {
+        padding: 8px 16px;
+        background: #007acc;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      #sendBtn:hover {
+        background: #005a9e;
+      }
+      #sendBtn:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+      #status {
+        padding: 8px;
+        margin: 16px 0;
+        border-radius: 4px;
+        font-weight: bold;
+      }
+      .connected {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+      .disconnected {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+      .connecting {
+        background: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
       }
     </style>
   </head>
   <body>
-    <h1>Minimal WebSocket (from scratch)</h1>
+    <h1>HyperSocket</h1>
     <p>
-      Open DevTools → Console/Network to observe frames. This page will connect
-      automatically.
+      Real-time chat room where all connected clients can send and receive
+      messages instantly.
     </p>
-    <div>
-      <input id="msg" placeholder="Type message" />
-      <button onclick="sendMsg()">Send</button>
+
+    <div id="status" class="connecting">Connecting to server...</div>
+
+    <div id="chat-container">
+      <div id="messages"></div>
+      <div id="input-container">
+        <input
+          id="msg"
+          placeholder="Type your message here..."
+          disabled
+          maxlength="500"
+        />
+        <button id="sendBtn" onclick="sendMsg()" disabled>Send</button>
+      </div>
     </div>
-    <pre id="log"></pre>
+
     <script>
-      const log = (...args) => {
-        document.getElementById("log").textContent += args.join(" ") + "\n";
+      const messagesDiv = document.getElementById("messages");
+      const statusDiv = document.getElementById("status");
+      const msgInput = document.getElementById("msg");
+      const sendBtn = document.getElementById("sendBtn");
+
+      let ws;
+      let clientId = Math.random().toString(36).substr(2, 8);
+
+      const log = (message, type = "info") => {
+        const timestamp = new Date().toLocaleTimeString();
+        const formattedMessage = `[${timestamp}] ${message}\n`;
+        messagesDiv.textContent += formattedMessage;
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
       };
-      const ws = new WebSocket("ws://localhost:8080/ws", "chat");
-      ws.onopen = () => {
-        log("WS open");
-        ws.send("hello from browser");
+
+      const updateStatus = (message, className) => {
+        statusDiv.textContent = message;
+        statusDiv.className = className;
       };
-      ws.onmessage = (e) => {
-        log("<-", e.data);
+
+      const connect = () => {
+        updateStatus("Connecting to server...", "connecting");
+
+        ws = new WebSocket("ws://localhost:8080/ws", "chat");
+
+        ws.onopen = () => {
+          updateStatus("Connected to chat room", "connected");
+          msgInput.disabled = false;
+          sendBtn.disabled = false;
+          msgInput.focus();
+          log(`Client ${clientId} joined the chat room`);
+          ws.send(`Client ${clientId} has joined the chat`);
+        };
+
+        ws.onmessage = (e) => {
+          log(`📩 ${e.data}`);
+        };
+
+        ws.onclose = (e) => {
+          updateStatus(" Disconnected from server", "disconnected");
+          msgInput.disabled = true;
+          sendBtn.disabled = true;
+          log(`Connection closed (${e.code}): ${e.reason || "Unknown reason"}`);
+
+          // Attempt to reconnect after 3 seconds
+          setTimeout(() => {
+            log("Attempting to reconnect...");
+            connect();
+          }, 3000);
+        };
+
+        ws.onerror = (e) => {
+          updateStatus("Connection error", "disconnected");
+          log(`Error: ${e.message || "WebSocket error occurred"}`);
+        };
       };
-      ws.onclose = (e) => {
-        log("WS close", e.code, e.reason);
-      };
-      ws.onerror = (e) => {
-        log("WS error", e.message || e);
-        complete("WS error", e.message || e);
-      };
+
       function sendMsg() {
-        const v = document.getElementById("msg").value;
-        ws.send(v);
+        const message = msgInput.value.trim();
+        if (!message) return;
+
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          const fullMessage = `Client ${clientId}: ${message}`;
+          ws.send(fullMessage);
+          msgInput.value = "";
+          log(`📤 You: ${message}`);
+        } else {
+          log("Cannot send message: Not connected to server");
+        }
       }
+
+      // Handle Enter key in input field
+      msgInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          sendMsg();
+        }
+      });
+
+      // Start connection
+      connect();
     </script>
   </body>
 </html>

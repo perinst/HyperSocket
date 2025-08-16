@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Minimal WS (Go)</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        max-width: 720px;
+        margin: 40px auto;
+      }
+      #log {
+        border: 1px solid #ddd;
+        padding: 8px;
+        min-height: 200px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Minimal WebSocket (from scratch)</h1>
+    <p>
+      Open DevTools → Console/Network to observe frames. This page will connect
+      automatically.
+    </p>
+    <div>
+      <input id="msg" placeholder="Type message" />
+      <button onclick="sendMsg()">Send</button>
+    </div>
+    <pre id="log"></pre>
+    <script>
+      const log = (...args) => {
+        document.getElementById("log").textContent += args.join(" ") + "\n";
+      };
+      const ws = new WebSocket("ws://" + location.host + "/ws", "chat");
+      ws.onopen = () => {
+        log("WS open");
+        ws.send("hello from browser");
+      };
+      ws.onmessage = (e) => {
+        log("<-", e.data);
+      };
+      ws.onclose = (e) => {
+        log("WS close", e.code, e.reason);
+      };
+      ws.onerror = (e) => {
+        log("WS error", e.message || e);
+        complete("WS error", e.message || e);
+      };
+      function sendMsg() {
+        const v = document.getElementById("msg").value;
+        ws.send(v);
+      }
+    </script>
+  </body>
+</html>
